@@ -13,8 +13,9 @@ def distance(x, y, i, j):
 
 
 class BilateralFilter(object):
-    def __init__(self, source, diameter, sigma_d, sigma_r):
-        self.source = source
+    def __init__(self, original, diameter, sigma_d, sigma_r):
+        self.original = original
+        self.filtered_image = np.zeros(self.original.shape)
         self.sigma_d = sigma_d
         self.sigma_r = sigma_r
         self.diameter = diameter
@@ -28,52 +29,62 @@ class BilateralFilter(object):
             return self.gaussian_constant_d * math.exp(- (x ** 2) / (2 * self.sigma_d ** 2))
 
     def find_neighbours(self, x, y, x_def, y_def):
+        """finds the coordinate of the current wanted neighbor, in distance x/y_def from the original point
+        in case this neighbor is off the image limits, returns the reflected pixel (in the diameter square)"""
         neighbour_x = x - x_def
         neighbour_y = y - y_def
-        if neighbour_x >= len(self.source):
+        if neighbour_x >= len(self.original):
             neighbour_x += 2*x_def
-        if neighbour_y >= len(self.source[0]):
+        if neighbour_y >= len(self.original[0]):
             neighbour_y += 2*y_def
         return (neighbour_x, neighbour_y)
 
-    def apply_bilateral_filter(self, filtered_image, x, y):
-        hl = int((self.diameter-1)/2)
+    def apply_bilateral_filter(self, x, y):
+        half_diameter = int((self.diameter-1)/2)
         i_filtered = 0
         Wp = 0
         i = 0
         while i < self.diameter:
             j = 0
             while j < self.diameter:
-                neighbour_x, neighbour_y = self.find_neighbours(x, y, (hl - i), (hl - j))
-                g_r = self.gaussian(int(self.source[neighbour_x][neighbour_y]) - int(self.source[x][y]), self.sigma_r)
-                g_d = self.gaussian(distance(neighbour_x, neighbour_y, x, y), self.sigma_d)
-                w = g_r * g_d
-                i_filtered += self.source[neighbour_x][neighbour_y] * w
+                neighbour_x, neighbour_y = self.find_neighbours(x, y, (half_diameter - i), (half_diameter - j))
+                gaussian_r = self.gaussian(int(self.original[neighbour_x][neighbour_y]) - int(self.original[x][y]), self.sigma_r)
+                gaussian_d = self.gaussian(distance(neighbour_x, neighbour_y, x, y), self.sigma_d)
+                w = gaussian_r * gaussian_d
+                i_filtered += self.original[neighbour_x][neighbour_y] * w
                 Wp += w
                 j += 1
             i += 1
         i_filtered = i_filtered / Wp
-        filtered_image[x][y] = int(round(i_filtered))
+        self.filtered_image[x][y] = int(round(i_filtered))
 
     def create_bilateral_filter(self):
-        filtered_image = np.zeros(self.source.shape)
-        i = 0
-        while i < len(self.source):
+        # while i < len(self.original):
+        for i in range(len(self.original)):
             print(i)
-            j = 0
-            while j < len(self.source[0]):
-                self.apply_bilateral_filter(filtered_image, i, j)
+            # while j < len(self.original[0]):
+            for j in range(len(self.original[0])):
+                self.apply_bilateral_filter(i, j)
                 j += 1
             i += 1
-        return filtered_image
+        return self.filtered_image
 
 
 if __name__ == "__main__":
-    src = cv2.imread(f"{image_path}/0.png", 0)
-    filtered_image_OpenCV = cv2.bilateralFilter(src, 5, 12.0, 16.0)
-    cv2.imwrite("original_image_grayscale.png", src)
-    cv2.imwrite("filtered_image_OpenCV.png", filtered_image_OpenCV)
-    bilateral_filter = BilateralFilter(src, 5, 12.0, 16.0)
-    filtered_image_own = bilateral_filter.create_bilateral_filter()
-    cv2.imwrite("filtered_image_own.png", filtered_image_own)
+    original_image = cv2.imread(f"{image_path}/0.png", 0)
+    # filtered_image_OpenCV = cv2.bilateralFilter(original_image, 5, 12.0, 16.0)
+    # cv2.imwrite("original_image_grayscale.png", src)
+    # cv2.imwrite("filtered_image_OpenCV.png", filtered_image_OpenCV)
+    bilateral_filter = BilateralFilter(original_image, 3, 12.0, 16.0)
+    filtered_image = bilateral_filter.create_bilateral_filter()
+    cv2.imwrite("filtered_image_window_3.png", filtered_image)
+    bilateral_filter = BilateralFilter(original_image, 5, 12.0, 16.0)
+    filtered_image = bilateral_filter.create_bilateral_filter()
+    cv2.imwrite("filtered_image_window_5.png", filtered_image)
+    bilateral_filter = BilateralFilter(original_image, 7, 12.0, 16.0)
+    filtered_image = bilateral_filter.create_bilateral_filter()
+    cv2.imwrite("filtered_image_window_7.png", filtered_image)
+    bilateral_filter = BilateralFilter(original_image, 9, 12.0, 16.0)
+    filtered_image = bilateral_filter.create_bilateral_filter()
+    cv2.imwrite("filtered_image_window_9.png", filtered_image)
 
