@@ -2,7 +2,8 @@ import numpy as np
 from cv2 import cv2
 import math
 import os
-from bilateralFilter.config import *
+from config import *
+
 pwd = os.path.abspath(os.getcwd())
 image_path = f"{pwd}/images"
 pi = math.pi
@@ -10,6 +11,16 @@ pi = math.pi
 
 def distance(x, y, i, j):
     return np.sqrt((x - i) ** 2 + (y - j) ** 2)
+
+
+def create_filter_and_sum_values():
+    if COLOR:
+        i_filtered = np.zeros(3)
+        Wp = np.zeros(3)
+    else:
+        i_filtered = 0
+        Wp = 0
+    return i_filtered, Wp
 
 
 class BilateralFilter(object):
@@ -38,53 +49,42 @@ class BilateralFilter(object):
             neighbour_x += 2 * x_def
         if neighbour_y >= len(self.original[0]):
             neighbour_y += 2 * y_def
-        return (neighbour_x, neighbour_y)
+        return neighbour_x, neighbour_y
 
-    def find_filtered_pixel_value(self, x, y, neighbour_x, neighbour_y, gaussian_d):
+    def calculate_single_value(self, neighbor_val, org_val, gaussian_d, sum_value, Wp):
+        gaussian_r = self.gaussian(int(neighbor_val) - int(org_val),
+                                   self.sigma_r)
+        w = gaussian_r * gaussian_d
+        sum_value += neighbor_val * w
+        Wp += w
+        return sum_value, Wp
+
+    def find_filtered_pixel_sum_value(self, x, y, neighbour_x, neighbour_y, gaussian_d, sum_value, Wp):
         if not self.color:
-            i_filtered = 0
-            Wp = 0
-            gaussian_r = self.gaussian(int(self.original[neighbour_x][neighbour_y]) - int(self.original[x][y]),
-                                       self.sigma_r)
-            w = gaussian_r * gaussian_d
-            i_filtered += self.original[neighbour_x][neighbour_y] * w
-            Wp += w
-            return int(round(i_filtered / Wp))
+            return self.calculate_single_value(self.original[neighbour_x][neighbour_y], self.original[x][y], gaussian_d,
+                                               sum_value, Wp)
         else:
-            i_filtered = np.zeros(3)
-            Wp = np.zeros(3)
-            gaussian_r_red = self.gaussian(
-                int(self.original[neighbour_x][neighbour_y][0]) - int(self.original[x][y][0]), self.sigma_r)
-            gaussian_r_green = self.gaussian(
-                int(self.original[neighbour_x][neighbour_y][1]) - int(self.original[x][y][1]), self.sigma_r)
-            gaussian_r_blue = self.gaussian(
-                int(self.original[neighbour_x][neighbour_y][2]) - int(self.original[x][y][2]), self.sigma_r)
-            w_red = gaussian_d * gaussian_r_red
-            w_green = gaussian_d * gaussian_r_green
-            w_blue = gaussian_d * gaussian_r_blue
-            i_filtered[0] += w_red * self.original[neighbour_x][neighbour_y][0]
-            i_filtered[1] += w_green * self.original[neighbour_x][neighbour_y][1]
-            i_filtered[2] += w_blue * self.original[neighbour_x][neighbour_y][2]
-            Wp += (w_red, w_green, w_blue)
-            i_filtered[0] = i_filtered[0] / (Wp[0])
-            i_filtered[1] = i_filtered[1] / (Wp[1])
-            i_filtered[2] = i_filtered[2] / (Wp[2])
-            return i_filtered
+            # calculate the filtered pixel value for red, green, and blue
+            for i in range(3):
+                neighbor_val = self.original[neighbour_x][neighbour_y][i]
+                sum_value[i], Wp[i] = self.calculate_single_value(neighbor_val, self.original[x][y][i], gaussian_d,
+                                                                  sum_value[i], Wp[i])
+            return sum_value, Wp
 
     def apply_bilateral_filter(self, x, y):
         half_diameter = int((self.diameter - 1) / 2)
+        sum_filtered_val, Wp = create_filter_and_sum_values()
         for i in range(self.diameter):
             for j in range(self.diameter):
                 neighbour_x, neighbour_y = self.find_neighbours(x, y, (half_diameter - i), (half_diameter - j))
                 gaussian_d = self.gaussian(distance(neighbour_x, neighbour_y, x, y), self.sigma_d)
-                filtered_pixel = self.find_filtered_pixel_value(x, y, neighbour_x, neighbour_y, gaussian_d)
-        self.filtered_image[x][y] = filtered_pixel
+                sum_filtered_val, Wp = self.find_filtered_pixel_sum_value(x, y, neighbour_x, neighbour_y, gaussian_d,
+                                                                          sum_filtered_val, Wp)
+        self.filtered_image[x][y] = sum_filtered_val / Wp
 
     def create_bilateral_filter(self):
-        # while i < len(self.original):
         for i in range(len(self.original)):
             print(i)
-            # while j < len(self.original[0]):
             for j in range(len(self.original[0])):
                 self.apply_bilateral_filter(i, j)
                 j += 1
@@ -102,4 +102,3 @@ if __name__ == "__main__":
         bilateral_filter = BilateralFilter(original_image, diameter, SIGMA_D, SIGMA_R, COLOR)
         filtered_image = bilateral_filter.create_bilateral_filter()
         cv2.imwrite(f"filtered_image_window_{diameter}.png", filtered_image)
-

@@ -1,4 +1,4 @@
 SIGMA_R = 16
 SIGMA_D = 12
-DIAMETER = [3, 5, 7]
+DIAMETER = [7]
 COLOR = True
