@@ -91,9 +91,9 @@ class BilateralFilter(object):
 
 if __name__ == "__main__":
     if COLOR:
-        original_image = cv2.imread(f"mini_taj.png")
+        original_image = cv2.imread(f"{image_path}/{IMAGE}")
     else:
-        original_image = cv2.imread(f"{image_path}/noised_lizard.png", 0)
+        original_image = cv2.imread(f"{image_path}/{IMAGE}", 0)
     cv2.imwrite("original_image.png", original_image)
     print(original_image[100][100])
     for diameter in DIAMETER:
